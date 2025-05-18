@@ -4,11 +4,22 @@ import pandas as pd
 def parse_constraint(constraint_str):
     try:
         left, right = constraint_str.split("<=")
-        coeffs = [float(x.strip().replace("x", "").replace("y", "")) for x in left.split("+")]
+        # Split by + and handle each term
+        terms = [term.strip() for term in left.split("+")]
+        coeffs = [0, 0, 0]  # Initialize with 3 variables (x, y, z)
+        
+        for term in terms:
+            if 'x' in term:
+                coeffs[0] = float(term.replace("x", "").strip() or 1)
+            elif 'y' in term:
+                coeffs[1] = float(term.replace("y", "").strip() or 1)
+            elif 'z' in term:
+                coeffs[2] = float(term.replace("z", "").strip() or 1)
+        
         limit = float(right.strip())
         return coeffs, limit
     except ValueError:
-        raise ValueError("Format invalide. Utilisez par ex. '500x + 800y <= 1500000'")
+        raise ValueError("Format invalide. Utilisez par ex. '500x + 800y + 600z <= 1500000'")
 
 def simplex_manual(c, A, b):
     n_vars = len(c)
