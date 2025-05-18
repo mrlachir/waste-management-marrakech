@@ -42,10 +42,15 @@ style.configure('Subheader.TLabel', font=subheading_font, background='#f5f5f5')
 style.configure('Primary.TButton', background='#4CAF50', foreground='white')
 style.configure('Secondary.TButton', background='#f0f0f0')
 style.configure('Card.TFrame', background='#ffffff', relief='solid', borderwidth=1)
+style.configure('Visualization.TFrame', background='#ffffff', relief='solid', borderwidth=1, padding=10)
 
 # Main container with padding
 main_container = ttk.Frame(root, padding="20 20 20 20")
 main_container.pack(fill=tk.BOTH, expand=True)
+
+# Configure the root window to handle resizing better
+root.grid_rowconfigure(0, weight=1)
+root.grid_columnconfigure(0, weight=1)
 
 # Title section
 title_frame = ttk.Frame(main_container)
@@ -192,35 +197,79 @@ buttons_frame.pack(fill=tk.X, pady=15)
 ttk.Button(buttons_frame, text="+ Ajouter une contrainte", command=add_constraint, style='Secondary.TButton').pack(side=tk.LEFT, padx=(0, 10))
 ttk.Button(buttons_frame, text="Calculer la solution optimale", command=calculate, style='Primary.TButton').pack(side=tk.LEFT)
 
-# Right column - Results and visualization
-results_frame = ttk.Frame(content_frame, padding="10 10 10 10")
-results_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+# Right column - Results and visualization in a scrollable container
+# Create a canvas with scrollbar for the right side
+right_canvas = tk.Canvas(content_frame, bg="#f5f5f5", highlightthickness=0)
+right_scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=right_canvas.yview)
+right_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+right_canvas.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
+right_canvas.configure(yscrollcommand=right_scrollbar.set)
+
+# Frame inside canvas to hold all content
+results_frame = ttk.Frame(right_canvas, padding="10 10 10 10")
+
+# Create a window inside the canvas to hold the frame
+results_frame_window = right_canvas.create_window((0, 0), window=results_frame, anchor="nw", tags="results_frame")
 
 # Results section with card-like appearance
-results_card = ttk.Frame(results_frame, padding="15 15 15 15")
-results_card.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+results_card = ttk.Frame(results_frame, padding="15 15 15 15", style='Card.TFrame')
+results_card.pack(fill=tk.X, expand=True, pady=(0, 15))
 
 ttk.Label(results_card, text="Résultats de l'optimisation", style='Subheader.TLabel').pack(anchor=tk.W, pady=(0, 10))
 
 # Zone de texte pour les tableaux avec meilleur style
 result_text = tk.Text(results_card, height=15, width=80, font=("Consolas", 10), bg="#ffffff", relief="flat")
-result_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+result_text.pack(fill=tk.BOTH, expand=True)
 result_text.configure(padx=10, pady=10)
 
-scrollbar = ttk.Scrollbar(results_card, orient="vertical", command=result_text.yview)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-result_text.config(yscrollcommand=scrollbar.set)
+text_scrollbar = ttk.Scrollbar(results_card, orient="vertical", command=result_text.yview)
+text_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+result_text.config(yscrollcommand=text_scrollbar.set)
 
-# Visualization section with card-like appearance
-visualization_card = ttk.Frame(results_frame, padding="15 15 15 15")
-visualization_card.pack(fill=tk.BOTH, expand=True)
+# Visualization section with enhanced card-like appearance
+visualization_card = ttk.Frame(results_frame, style='Visualization.TFrame')
+visualization_card.pack(fill=tk.X, expand=True, pady=(0, 20))
 
-ttk.Label(visualization_card, text="Visualisation graphique", style='Subheader.TLabel').pack(anchor=tk.W, pady=(0, 10))
+ttk.Label(visualization_card, text="Visualisation graphique", style='Subheader.TLabel').pack(anchor=tk.W, pady=(0, 15))
+
+# Container for the graph with fixed height to ensure visibility
+graph_container = ttk.Frame(visualization_card)
+graph_container.pack(fill=tk.BOTH, expand=True)
 
 # Graphique avec meilleur style
 fig = plt.Figure(figsize=(10, 6), dpi=100, facecolor='#ffffff')
-canvas = FigureCanvasTkAgg(fig, master=visualization_card)
-canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+canvas = FigureCanvasTkAgg(fig, master=graph_container)
+canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+# Configure the canvas to update scroll region when the frame size changes
+def configure_scroll_region(event):
+    right_canvas.configure(scrollregion=right_canvas.bbox("all"))
+    # Make sure the window width matches the canvas width
+    right_canvas.itemconfig("results_frame", width=right_canvas.winfo_width())
+
+results_frame.bind("<Configure>", configure_scroll_region)
+
+# Bind mouse wheel to scroll the canvas
+def _on_mousewheel(event):
+    # Get the widget under the cursor
+    widget = event.widget
+    # Check if the cursor is over the canvas or its children
+    if widget == right_canvas or widget.master == right_canvas or widget.master.master == right_canvas:
+        right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+# Bind the mousewheel event to the canvas and its children
+right_canvas.bind("<MouseWheel>", _on_mousewheel)
+results_frame.bind("<MouseWheel>", _on_mousewheel)
+# Also bind to the visualization card to ensure scrolling works when hovering over the graph
+visualization_card.bind("<MouseWheel>", _on_mousewheel)
+graph_container.bind("<MouseWheel>", _on_mousewheel)
+
+# Update the canvas scroll region when the window is resized
+def on_window_resize(event):
+    # Update the canvas scroll region
+    right_canvas.configure(scrollregion=right_canvas.bbox("all"))
+
+root.bind("<Configure>", on_window_resize)
 
 # Lancer l'application
 root.mainloop()
